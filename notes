@@ -1,0 +1,143 @@
+ mbtgmbefehjxspsb 
+
+
+/usr/local/bin/codesourcery-arm-2011.03.sh
+
+http://www.nas-central.org/wiki/Setting_up_the_codesourcery_toolchain_for_X86_to_ARM9_cross_compiling
+
+
+chistenje na build:
+
+sudo make clean
+sudo make distclean
+sudo git clean -fdx
+
+
+
+qemu-system-arm -M beaglexm
+
+https://github.com/equinoxorg/eko_client/wiki/Creating-a-Redeployable-SD-Card-Image
+https://wiki.linaro.org/Resources/HowTo/Qemu-beagleboard
+
+demek:
+http://balau82.wordpress.com/2010/04/12/booting-linux-with-u-boot-on-qemu-arm/
+http://balau82.wordpress.com/2010/03/27/busybox-for-arm-on-qemu/
+
+
+
+fallocate -l 1G sdcard.img (prazen sdcard image od 1 gb)
+chmod +x sd-format
+sudo ./sd-format sdcard.img
+sudo kpartx -av sdcard.img
+(vo cross compile)
+vo u-boot:
+make omap3_beagle_config
+make -j2 (za build)
+mount na boot
+cp MLO /media/boot/
+sync
+cp u-boot.img /media/boot/
+cp ../linux/arch/arm/boot/zImage /media/boot/
+cp ~/Downloads/sdcardimage/uEnv.txt /media/boot/
+umount /media/boot
+sudo kpartx -d sdcard.img
+qemu-system-arm -M beaglexm -drive if=sd,cache=writeback,file=./sdcard.img -clock unix -nographic
+
+za dodatna particija: izvrshi ja skriptata i potoa izvrshi gi slednite komandi
+fdisk sdcard.img
+:n
+:p
+:3
+:w
+sudo kpartx -a sdcard.img
+sudo mkfs.ext3 -L ime_na_particija /dev/mapper/loop0p3
+
+mkimage -A arm -O linux -T script -C none -a 0 -e 0 -n "SD Boot" -d script.txt boot.scr
+
+
+
+uart1 iir_reg (efr_reg) address: 0x4806A008 
+uart1 ier_reg address: 0x4806A004
+
+chitanje na vrednost od adresa na registar:
+md 0x4806A008 10
+dava vrednost: 00000001 00000000 00000008 00000060
+najverojatno 00000001 e potrebnata 32-bitna adresa... i bi trebalo da se smeni vo 000000c1
+a toa se pravi so:
+mm 0x4806A008 i vnesuvame 000000c1
+
+
+za vim:
+dd if=/dev/zero of=binaren.bin bs=1 count=4
+xxd -g 1 binaren.bin > binaren.hex
+vi binaren.hex
+:%!xxd
+editiranje
+:%!xxd -r
+:wq
+xxd -r binaren.hex > binaren.bin
+dd if=binaren.bin bs=1  >> uImage
+
+LINARO:
+sudo apt-add-repository ppa:linaro-maintainers/toolchain
+sudo apt-get install gcc-arm-linux-gnueabi
+
+
+arm-linux-gnueabi-gcc -static -o init main.c
+sudo kpartx -av .img
+sudo mkdir /media/rootfs/sbin
+sudo cp -a init/init /media/rootfs/sbin/
+umount ...
+sudo kpartx -d ...
+qemu ....
+
+
+
+BUSYBOX:
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- defconfig (vo busybox)
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- menuconfig -> build busybox as a static binary (build options) -> networking utulities (iskluchi gi ip, ifupdown i inetd)
+make -j4 ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-
+kpartx -av .img
+sudo rm /media/rootfs/sbin/init
+sudo mkdir /media/rootfs/bin
+sudo cp -a busybox /media/rootfs/bin/ (vo busybox sme)
+cd /media/rootfs/bin/
+sudo ln -s busybox sh
+sudo ln -s busybox ls
+sudo ln -s busybox ln
+umount i kpartx -d
+qemu
+primer za dodavanje komanda (primer za mount): ln -s busybox mount
+primeri:
+# mkdir proc
+/ # mkdir sys
+bin # ln -s busybox mount
+/bin # 
+/bin # mount -t proc none /proc
+/bin # mount -t sysfs none /sys
+/bin # cd /sys/
+/sys # cd block/
+...
+busybox sync
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

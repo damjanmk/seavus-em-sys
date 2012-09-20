@@ -122,25 +122,155 @@ busybox sync
 
 TETEEEEE
 
+===Linaro Tools Cross Compiler===
+sudo add-apt-repository ppa:linaro-maintainers/toolchain
+sudo apt-get update
+sudo apt-get install gcc-arm-linux-gnueabi
 
+во ~/.bashrc
+export ARCH=arm
+export CROSS_COMPILE=arm-linux-gnueabi-
+Сега се вклучено во и само со make се прави make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-
 
+===vezba_2===
+1. a) uniq -dc filename
+   b) sort -u filename
+   c) grep ^a.*ka$ filename
+2. find . -name "*.[ch]" -exec grep -l "\bprintf" '{}' \;
+3. find . -name "*.txt" -exec sed -i 's/note/NOTE/' '{}' \;
+4. man 2 open (За да се најде некој шаблон се пишува  знакот '/' и после него текст на пр '/O_DIRECT' и после со n се оди на следно (next), а со Shift+n на претходно совпаѓање)
+5. Скрипта во sbin (Во bin мора да се busybox sh mount...) (треба да нема друг init)
+	#!/bin/sh
 
+	if [ -d "/proc" -a -d "/sys" -a -d "/tmp" ]
+	then
+		echo Root file-system already initialized.
+	else
+		mkdir /proc
+		mkdir /sys
+		mkdir /tmp	
+	fi
 
+	mount -t proc none /proc
+	mount -t sysfs none /sys
+	mount -t tmpfs none /tmp
+	#mount -t devtmpfs none /dev
+	/bin/sh
 
+===Вграден ramrfs===
+Се прави нова папка и во неа се прават сите потребни папки (proc, sys... и init)
+Во source-от на Линуксот преку menuconfig се додава патеката на оваа папка (пр. target-rootfs/) во 
 
+General Setup->Initial RAM filesystem and RAM disk (initramfs/initrd) support
 
+После се гради нова слика во којашто има вграден rootfs
+ 
+===Hello World Module===
+{Out of tree e koga se gradi vo drug folder i posle samo .ko se instalira; 
+mkdir hello-module
+cd hello-module/
+gedit hello.c &
+	#include <linux/init.h>
+	#include <linux/module.h>
+	#include <linux/kernel.h>
 
+	static int __init hello_init(void)
+	{
+		printk(KERN_INFO "Hello from Linux Kernel\n");
+		return 0;
+	}
 
+	static void __exit hello_exit(void)
+	{
+		printk(KERN_INFO "Bye from Linux Kernel\n");
+	}
 
+	module_init(hello_init);
+	module_exit(hello_exit);
 
+gedit Makefile &
+	ifneq ($(KERNELRELEASE),)
+	obj-m := hello.o			//ova ke se izvrshi na povik na make modules
+	else
+	KDIR ?= /usr/src/linux-headers-`uname -r`
+	all:
+		$(MAKE) -C $(KDIR) M=`pwd` modules
+	clean: 
+		$(MAKE) -C $(KDIR) M=`pwd` clean
+	endif
+uname -r (ja dava verzijata na tekovniot linux kernel na kompjuterot)
+ls -l /usr/src/linux-headers-3.2.0-30-generic-pae/ (source-ot se naogja na ovaa pateka, ova treba da e vo KDIR ili podobro e so `uname -r` dinamichki da se vnesuva patekata, da ne e hardkodirano)
+}
 
+{Gradenje na modul (out of tree) za x86 i testiranje na lokalnata mashina;
+unset ARCH
+unset CROSS_COMPILE
+make (ovoj make e za x86, ne za arm)
+ls -l (ima hello.o, hello.ko itn.)
+file hello.ko (pokazuva deka e ELF...)
+readelf -e hello.ko (se chita ELF file-ot kajshto mozhe da se vidat site sektori)
+sudo insmod hello.ko 
+lsmod
+lsmod | grep hello
+dmesg 
+sudo rmmod -f hello
+dmesg (tuka se ispishuva od printk + se kazhuva deka e tainted, zashto nemame vneseno licenca)
+cat /proc/sys/kernel/tainted (ovde se chuva nekoja shifra shto kazhuva dali e tainted kernelot i sl)
+}
 
+{Gradenje na modul (out of tree) za arm. KDIR mozhe da prima vrednost i od komandna linija ( zatoa e ?= ) ;
+export ARCH=arm
+export CROSS_COMPILE=arm-linux-gnueabi-
+cd Documents/Damjan/hello-module/
+make KDIR=/home/user/Documents/Damjan/linux-raw 
+file hello.ko
+make KDIR=/home/user/Documents/Damjan/linux-raw clean (clean e target, sega mozhe i da se pravi clean od komandna linija)
+make KDIR=/home/user/Documents/Damjan/linux-raw (ako nema target od komandna linija se izvrshuva prviot target - all: )
+qemu-system-arm -M beaglexm -drive if=sd,cache=writeback,file=./sd-hm-out-of-tree.img -clock unix -nographic
+}
 
+{Ova e out of tree zashto e izgradeno nadvor vo hello-module/ Za da se instalira na plochka treba da go ima hello.ko vo /lib/modules/verzijata na os (se gleda so: uname -r);
+cd /media/rootfs/
+sudo mkdir lib
+cd lib/
+sudo mkdir modules
+cd modules/
+sudo mkdir 3.5.3+	(3.5.3+ e dobieno so: uname -r)
+cd 3.5.3+/
+sudo cp ~/Documents/Damjan/hello-module/hello.ko ./ 
+(sega vo sh vo qemu so insmod moze da go instalirame)
+ / # busybox insmod lib/modules/3.5.3\+/hello.ko 
+	[  610.979187] hello: module license 'unspecified' taints kernel.
+	[  610.	980255] Disabling lock debugging due to kernel taint
+	[  610.989044] Hello from Linux Kernel
+ / # busybox lsmod
+	hello 746 0 - Live 0xbf000000 (PO)
+ / # busybox rmmod hello
+	[  627.077362] Bye from Linux Kernel
+ / # busybox lsmod
+}
 
+{Vnatre vo kernelot e <<in tree>> i mozhe da go vkluchuvame statichki, za toa treba da go iskopirame hello.c vo drivers/misc i da gi smenime Kconfig i Makefile, posle mozhe da go vkluchime vo menuconfig;
+cp Documents/Damjan/hello-module/hello.c Documents/Damjan/linux-raw/drivers/misc/
+cd Documents/Damjan/drivers/
+cd Documents/Damjan/linux-raw/drivers/
+gedit Kconfig &
+(copy na posledniot zapis i izmena za HELLO)
+	config HELLO
+		tristate "hello"
+		help
+		  Seavus Training
+gedit Makefile &
+(copy na posledniot zapis i izmena za hello)
+	obj-$(CONFIG_HELLO)		+= hello.o   
+(bez / na kraj. Imeto e vazno: toa CONFIG_HELLO - HELLO e imeto definiano vo Kconfig)
+ make menuconfig (Device drivers->Misc drivers-> se pojavuva hello, mozhe da se selektira, sega e vkluchen statichki)
+ make -j4
 
-
-
-
-
-
-promena
+ cd linux-hello-module/
+ cd arch/arm/boot/
+ strings Image | grep Hello
+(tuka se chuvaat stringovite shto se pishuvaat na ekran)
+qemu-system-arm -M beaglexm -drive if=sd,cache=writeback,file=./sd-hm-in-tree.img -clock unix -nographic
+(sega vo logot za gradenjeto na kernelot mozhe da se prochita porakata printk od modulot)
+}

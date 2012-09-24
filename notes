@@ -1,18 +1,10 @@
- mbtgmbefehjxspsb 
-
-
 /usr/local/bin/codesourcery-arm-2011.03.sh
-
 http://www.nas-central.org/wiki/Setting_up_the_codesourcery_toolchain_for_X86_to_ARM9_cross_compiling
 
-
 chistenje na build:
-
 sudo make clean
 sudo make distclean
 sudo git clean -fdx
-
-
 
 qemu-system-arm -M beaglexm
 
@@ -22,7 +14,6 @@ https://wiki.linaro.org/Resources/HowTo/Qemu-beagleboard
 demek:
 http://balau82.wordpress.com/2010/04/12/booting-linux-with-u-boot-on-qemu-arm/
 http://balau82.wordpress.com/2010/03/27/busybox-for-arm-on-qemu/
-
 
 
 fallocate -l 1G sdcard.img (prazen sdcard image od 1 gb)
@@ -55,7 +46,6 @@ sudo mkfs.ext3 -L ime_na_particija /dev/mapper/loop0p3
 mkimage -A arm -O linux -T script -C none -a 0 -e 0 -n "SD Boot" -d script.txt boot.scr
 
 
-
 uart1 iir_reg (efr_reg) address: 0x4806A008 
 uart1 ier_reg address: 0x4806A004
 
@@ -65,7 +55,6 @@ dava vrednost: 00000001 00000000 00000008 00000060
 najverojatno 00000001 e potrebnata 32-bitna adresa... i bi trebalo da se smeni vo 000000c1
 a toa se pravi so:
 mm 0x4806A008 i vnesuvame 000000c1
-
 
 za vim:
 dd if=/dev/zero of=binaren.bin bs=1 count=4
@@ -90,7 +79,6 @@ sudo cp -a init/init /media/rootfs/sbin/
 umount ...
 sudo kpartx -d ...
 qemu ....
-
 
 
 BUSYBOX:
@@ -207,7 +195,7 @@ unset ARCH
 unset CROSS_COMPILE
 make (ovoj make e za x86, ne za arm)
 ls -l (ima hello.o, hello.ko itn.)
-file hello.ko (pokazuva deka e ELF...)
+file hello.ko (pokazuva deka e ELF Intel 80386)
 readelf -e hello.ko (se chita ELF file-ot kajshto mozhe da se vidat site sektori)
 sudo insmod hello.ko 
 lsmod
@@ -227,6 +215,8 @@ file hello.ko
 make KDIR=/home/user/Documents/Damjan/linux-raw clean (clean e target, sega mozhe i da se pravi clean od komandna linija)
 make KDIR=/home/user/Documents/Damjan/linux-raw (ako nema target od komandna linija se izvrshuva prviot target - all: )
 qemu-system-arm -M beaglexm -drive if=sd,cache=writeback,file=./sd-hm-out-of-tree.img -clock unix -nographic
+*може само make без KDIR=/home/user/Documents/Damjan/linux-raw заради KDIR ?= /usr/src/linux-headers-`uname -r`*
+(ако сакаме за ubuntu без параметри на make, а ако сакаме за arm тогаш со KDIR = /patekata)
 }
 
 {Ova e out of tree zashto e izgradeno nadvor vo hello-module/ Za da se instalira na plochka treba da go ima hello.ko vo /lib/modules/verzijata na os (se gleda so: uname -r);
@@ -273,4 +263,36 @@ gedit Makefile &
 (tuka se chuvaat stringovite shto se pishuvaat na ekran)
 qemu-system-arm -M beaglexm -drive if=sd,cache=writeback,file=./sd-hm-in-tree.img -clock unix -nographic
 (sega vo logot za gradenjeto na kernelot mozhe da se prochita porakata printk od modulot)
+}
+
+{Параметри на модул
+	#include <linux/init.h>
+	#include <linux/module.h>
+	#include <linux/kernel.h>
+
+	static char* person = "Nobody";
+	module_param(person, charp, 0);
+
+	static int count = 1;
+	module_param(count, int, S_IRUGO);
+
+	static int __init hello_init(void)
+	{
+		int i;
+		for(i=0; i <= count; ++i)
+			pr_info("Hello %s\n", person);
+		return 0;
+	}
+
+	static void __exit hello_exit(void)
+	{
+		pr_info("Bye from Linux Kernel\n");
+	}
+
+	module_init(hello_init);
+	module_exit(hello_exit);
+
+	MODULE_LICENSE("GPL");
+(проверка за x86, make (без ARCH=arm...), insmod hello.ko person="Damjan" count=3)
+Ако параметарот има дозвола за пишување може да му се менува вредноста во run-time. Може со echo 10 | /sys/module/hello/param-name. На пример ако параметрот е време на правење на нешто и е 1ms може да се намести на 1s без да се рестартира.
 }

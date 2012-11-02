@@ -190,7 +190,7 @@ uname -r (ja dava verzijata na tekovniot linux kernel na kompjuterot)
 ls -l /usr/src/linux-headers-3.2.0-30-generic-pae/ (source-ot se naogja na ovaa pateka, ova treba da e vo KDIR ili podobro e so `uname -r` dinamichki da se vnesuva patekata, da ne e hardkodirano)
 }
 
-{Gradenje na modul (out of tree) za x86 i testiranje na lokalnata mashina;
+{Gradenje na modul (out of tree) za x86 i testiranje na lokalnata mashina. Во папката кајшто е модлот си;
 unset ARCH
 unset CROSS_COMPILE
 make (ovoj make e za x86, ne za arm)
@@ -242,8 +242,7 @@ sudo cp ~/Documents/Damjan/hello-module/hello.ko ./
 
 {Vnatre vo kernelot e <<in tree>> i mozhe da go vkluchuvame statichki, za toa treba da go iskopirame hello.c vo drivers/misc i da gi smenime Kconfig i Makefile, posle mozhe da go vkluchime vo menuconfig;
 cp Documents/Damjan/hello-module/hello.c Documents/Damjan/linux-raw/drivers/misc/
-cd Documents/Damjan/drivers/
-cd Documents/Damjan/linux-raw/drivers/
+cd Documents/Damjan/linux-raw/drivers/misc/
 gedit Kconfig &
 (copy na posledniot zapis i izmena za HELLO)
 	config HELLO
@@ -295,4 +294,70 @@ qemu-system-arm -M beaglexm -drive if=sd,cache=writeback,file=./sd-hm-in-tree.im
 	MODULE_LICENSE("GPL");
 (проверка за x86, make (без ARCH=arm...), insmod hello.ko person="Damjan" count=3)
 Ако параметарот има дозвола за пишување може да му се менува вредноста во run-time. Може со echo 10 | /sys/module/hello/param-name. На пример ако параметрот е време на правење на нешто и е 1ms може да се намести на 1s без да се рестартира.
+}
+
+{Вежби 3, задача 1. in-tree се внесува my-module.c во сликата. 
+Во menuconfig треба да се подеси на M. 
+После мора да се направи make modules, во linux source за да се направи my-module.ko. Тој после треба да се копира во lib/modules/3.5.3+ и може да се внесе со busybox insmod.
+
+задача 2.
+во Kconfig се внесуваат променливи што ги има menuconfig и може да се користат во c со CONFIG_ пред нив.
+}
+
+{
+двојно поврзан циркуларна,
+како се поврзани,
+add и add_tail,
+како се ослободува меморијата,
+како се копираат листи
+}
+
+{модул со основните функции}
+{драјвер со специјалните структури}
+{ за qemu
+во linux/arch/arm/mach-omap2/board-omap3beagle.c
+static struct platform_device hello ={
+	.name = "hello",
+	.id = -1,
+};
+
+static struct platform_device *omap3_beagle_devices[] __initdata = {
+	&leds_gpio,
+	&keys_gpio,
+	&madc_hwmon,
+	&hello, //ova <
+};
+со ова правиме да изгледа дека има приклучен platform device
+и во
+sys/devices/platform/hello/modalias ima platform:hello
+во qemu 
+mknod /dev/hello c 202 128
+insmod lib/modules/3.5.3+/hello.ko
+и сега може 
+со ehco test > /dev/hello да се запише и повика write
+со cat /dev/hello да се повика read
+
+за да не е со глобална структура, треба со private_data
+тие се сетираат за секоја структура
+после тоа од inode се зема структурата со container_of
+и се сместува во file->private_data
+за да може после да се чита
+
+probe-remove
+open-release}
+
+
+{17.10.12
+секоја нишка си добива посебен stack
+во линукс секогаш се распоредуваат нишки (не процес, па после процесот да си распореди нишки), во кернелот се распоредуваат нишките и се викаат таскови
+
+таскови / спиење
+}
+{interrupt}
+{concurrency
+мутекс, спинлок (во интерапт контекст не може мутекс, мора спинлок)
+}
+{
+driver за user копчето на плочката
+треба да се компајлира кернелот без key_event вклучен (коментиран да биде)
 }
